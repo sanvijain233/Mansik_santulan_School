@@ -1,489 +1,539 @@
-(() => {
-  "use strict";
+"use strict";
 
-  const API_BASE = "https://mansik-santulan-backend.onrender.com";
+const API_BASE = "https://mansik-santulan-backend.onrender.com";
 
-  const form = document.getElementById("predict-form");
-  const submitBtn = document.getElementById("submit-btn");
-  const resetBtn = document.getElementById("reset-btn");
-  const errorRetryBtn = document.getElementById("error-retry-btn");
+const form = document.getElementById("predict-form");
+const submitBtn = document.getElementById("submit-btn");
+const resetBtn = document.getElementById("reset-btn");
+const errorRetryBtn = document.getElementById("error-retry-btn");
 
-  const stateIdle = document.getElementById("state-idle");
-  const stateLoading = document.getElementById("state-loading");
-  const stateResult = document.getElementById("state-result");
-  const stateError = document.getElementById("state-error");
+const stateIdle = document.getElementById("state-idle");
+const stateLoading = document.getElementById("state-loading");
+const stateResult = document.getElementById("state-result");
+const stateError = document.getElementById("state-error");
 
-  const scoreNumberEl = document.getElementById("score-number");
-  const scoreBandEl = document.getElementById("score-band");
-  const scoreContextEl = document.getElementById("score-context");
-  const gaugeFill = document.getElementById("gauge-fill");
-  const errorLabelEl = document.getElementById("error-label");
-  const errorCopyEl = document.getElementById("error-copy");
+const scoreNumberEl = document.getElementById("score-number");
+const scoreBandEl = document.getElementById("score-band");
+const scoreContextEl = document.getElementById("score-context");
+const gaugeFill = document.getElementById("gauge-fill");
 
-  const GAUGE_ARC_LENGTH = 314;
+const errorLabelEl = document.getElementById("error-label");
+const errorCopyEl = document.getElementById("error-copy");
 
-  function drawTicks() {
-    document.querySelectorAll(".gauge-ticks").forEach((g) => {
-      g.innerHTML = "";
+const stressButtons = document.querySelectorAll("[data-stress]");
+const stressInput = document.getElementById("stress-level");
 
-      const cx = 120;
-      const cy = 140;
-      const rOuter = 100;
-      const rInner = 90;
+const GAUGE_ARC_LENGTH = 314;
 
-      for (let i = 0; i <= 10; i += 2) {
-        const angle = Math.PI - (i / 10) * Math.PI;
-
-        const x1 = cx + rOuter * Math.cos(angle);
-        const y1 = cy - rOuter * Math.sin(angle);
-
-        const x2 = cx + rInner * Math.cos(angle);
-        const y2 = cy - rInner * Math.sin(angle);
-
-        const line = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "line"
-        );
-
-        line.setAttribute("x1", x1.toFixed(1));
-        line.setAttribute("y1", y1.toFixed(1));
-        line.setAttribute("x2", x2.toFixed(1));
-        line.setAttribute("y2", y2.toFixed(1));
-
-        g.appendChild(line);
-      }
-    });
-  }
-
-  drawTicks();
-
-  const segGroup = document.getElementById("stress_level_group");
-  const stressHiddenInput = document.getElementById("stress_level");
-
-  if (segGroup) {
-    segGroup.querySelectorAll(".seg-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        segGroup
-          .querySelectorAll(".seg-btn")
-          .forEach((b) => b.classList.remove("active"));
-
-        btn.classList.add("active");
-
-        stressHiddenInput.value = btn.dataset.value;
-
-        clearFieldError(stressHiddenInput);
-      });
-    });
-  }
-
-  function fieldWrapper(input) {
-    return input.closest(".field");
-  }
-
-  function setFieldError(input, message) {
-    const wrap = fieldWrapper(input);
-
-    if (!wrap) return;
-
-    wrap.classList.add("field-error");
-
-    const msgEl = wrap.querySelector(".error-msg");
-
-    if (msgEl) {
-      msgEl.textContent = message;
-    }
-  }
-
-  function clearFieldError(input) {
-    const wrap = fieldWrapper(input);
-
-    if (!wrap) return;
-
-    wrap.classList.remove("field-error");
-
-    const msgEl = wrap.querySelector(".error-msg");
-
-    if (msgEl) {
-      msgEl.textContent = "";
-    }
-  }
-
-  function clearAllErrors() {
-    form.querySelectorAll(".field").forEach((f) => {
-      f.classList.remove("field-error");
-    });
-
-    form.querySelectorAll(".error-msg").forEach((m) => {
-      m.textContent = "";
-    });
-  }
-
-  function collectPayload() {
-    const fd = new FormData(form);
-
-    return {
-      age:
-        fd.get("age") === ""
-          ? NaN
-          : parseInt(fd.get("age"), 10),
-
-      gender: fd.get("gender") || "",
-
-      country: (fd.get("country") || "").trim(),
-
-      academic_level:
-        fd.get("academic_level") || "",
-
-      most_used_platform:
-        fd.get("most_used_platform") || "",
-
-      purpose_of_use:
-        fd.get("purpose_of_use") || "",
-
-      avg_daily_usage_hours:
-        fd.get("avg_daily_usage_hours") === ""
-          ? NaN
-          : parseFloat(fd.get("avg_daily_usage_hours")),
-
-      daily_unlocks:
-        fd.get("daily_unlocks") === ""
-          ? NaN
-          : parseInt(fd.get("daily_unlocks"), 10),
-
-      study_hours:
-        fd.get("study_hours") === ""
-          ? NaN
-          : parseFloat(fd.get("study_hours")),
-
-      physical_activity_hours:
-        fd.get("physical_activity_hours") === ""
-          ? NaN
-          : parseFloat(fd.get("physical_activity_hours")),
-
-      sleep_hours_per_night:
-        fd.get("sleep_hours_per_night") === ""
-          ? NaN
-          : parseFloat(fd.get("sleep_hours_per_night")),
-
-      stress_level:
-        fd.get("stress_level") || "",
-    };
-  }
-
-  function validate(payload) {
-    const errors = [];
-
-    const numericChecks = [
-      ["age", 10, 100],
-      ["avg_daily_usage_hours", 0, 24],
-      ["daily_unlocks", 0, Infinity],
-      ["study_hours", 0, 24],
-      ["physical_activity_hours", 0, 24],
-      ["sleep_hours_per_night", 0, 24],
+function showState(state) {
+    const states = [
+        stateIdle,
+        stateLoading,
+        stateResult,
+        stateError
     ];
 
-    numericChecks.forEach(([key, min, max]) => {
-      const input = document.getElementById(key);
-      const val = payload[key];
-
-      if (
-        val === "" ||
-        val === null ||
-        Number.isNaN(val)
-      ) {
-        errors.push([input, "This field is required."]);
-      } else if (val < min || val > max) {
-        errors.push([
-          input,
-          `Must be between ${min} and ${
-            max === Infinity ? "0+" : max
-          }.`,
-        ]);
-      }
+    states.forEach((element) => {
+        if (element) {
+            element.hidden = true;
+        }
     });
 
-    [
-      "gender",
-      "country",
-      "academic_level",
-      "most_used_platform",
-      "purpose_of_use",
-    ].forEach((key) => {
-      const input = document.getElementById(key);
-
-      if (
-        !payload[key] ||
-        String(payload[key]).trim() === ""
-      ) {
-        errors.push([input, "This field is required."]);
-      }
-    });
-
-    if (!payload.stress_level) {
-      errors.push([
-        stressHiddenInput,
-        "Pick a stress level.",
-      ]);
+    if (state === "idle" && stateIdle) {
+        stateIdle.hidden = false;
     }
 
-    return errors;
-  }
-
-  function showState(name) {
-    [
-      stateIdle,
-      stateLoading,
-      stateResult,
-      stateError,
-    ].forEach((el) => {
-      if (el) {
-        el.hidden = true;
-      }
-    });
-
-    const states = {
-      idle: stateIdle,
-      loading: stateLoading,
-      result: stateResult,
-      error: stateError,
-    };
-
-    if (states[name]) {
-      states[name].hidden = false;
+    if (state === "loading" && stateLoading) {
+        stateLoading.hidden = false;
     }
-  }
 
-  function setSubmitting(isSubmitting) {
-    submitBtn.disabled = isSubmitting;
-    submitBtn.classList.toggle("loading", isSubmitting);
-  }
+    if (state === "result" && stateResult) {
+        stateResult.hidden = false;
+    }
 
-  function bandFor(score) {
+    if (state === "error" && stateError) {
+        stateError.hidden = false;
+    }
+}
+
+
+function bandFor(score) {
     if (score < 4) {
-      return {
-        label: "Signal: strained",
-        context:
-          "Your responses suggest elevated strain right now. Small shifts in sleep or screen time can go a long way.",
-      };
+        return {
+            label: "Signal: strained",
+            context: "The current pattern suggests that some daily habits may need attention."
+        };
     }
 
     if (score < 7) {
-      return {
-        label: "Signal: balanced",
-        context:
-          "Your rhythm looks fairly steady, with some room to recover and reset.",
-      };
+        return {
+            label: "Signal: balanced",
+            context: "The current pattern looks relatively balanced across the measured factors."
+        };
     }
 
     return {
-      label: "Signal: strong",
-      context:
-        "Your habits point to a well-supported, resilient baseline. Keep it up.",
+        label: "Signal: strong",
+        context: "The current pattern shows relatively strong indicators across the measured factors."
     };
-  }
+}
 
-  function renderResult(score) {
+
+function renderResult(score) {
     const numericScore = Number(score);
 
-    const clamped = Math.max(
-      0,
-      Math.min(10, numericScore)
+    if (!Number.isFinite(numericScore)) {
+        showError(
+            "Unexpected response",
+            "The server returned an invalid score."
+        );
+        return;
+    }
+
+    const clampedScore = Math.max(
+        0,
+        Math.min(10, numericScore)
     );
 
-    const { label, context } = bandFor(clamped);
+    const result = bandFor(clampedScore);
 
-    scoreNumberEl.textContent = numericScore.toFixed(2);
-    scoreBandEl.textContent = label;
-    scoreContextEl.textContent = context;
+    if (scoreNumberEl) {
+        scoreNumberEl.textContent = numericScore.toFixed(2);
+    }
 
-    gaugeFill.style.transition = "none";
-    gaugeFill.style.strokeDashoffset =
-      String(GAUGE_ARC_LENGTH);
+    if (scoreBandEl) {
+        scoreBandEl.textContent = result.label;
+    }
 
-    requestAnimationFrame(() => {
-      gaugeFill.style.transition = "";
+    if (scoreContextEl) {
+        scoreContextEl.textContent = result.context;
+    }
 
-      const offset =
-        GAUGE_ARC_LENGTH *
-        (1 - clamped / 10);
+    if (gaugeFill) {
+        gaugeFill.style.transition = "none";
+        gaugeFill.style.strokeDashoffset = String(
+            GAUGE_ARC_LENGTH
+        );
 
-      gaugeFill.style.strokeDashoffset =
-        String(offset);
-    });
+        requestAnimationFrame(() => {
+            gaugeFill.style.transition = "";
+
+            const offset =
+                GAUGE_ARC_LENGTH *
+                (1 - clampedScore / 10);
+
+            gaugeFill.style.strokeDashoffset =
+                String(offset);
+        });
+    }
 
     showState("result");
-  }
+}
 
-  function renderError(label, copy) {
-    errorLabelEl.textContent = label;
-    errorCopyEl.textContent = copy;
+
+function showError(label, message) {
+    if (errorLabelEl) {
+        errorLabelEl.textContent = label;
+    }
+
+    if (errorCopyEl) {
+        errorCopyEl.textContent = message;
+    }
 
     showState("error");
-  }
+}
 
-  function applyServerValidationErrors(detail) {
-    if (!Array.isArray(detail)) {
-      return false;
+
+function getValue(id) {
+    const element = document.getElementById(id);
+
+    if (!element) {
+        return "";
     }
 
-    let matched = false;
+    return element.value;
+}
 
-    detail.forEach((err) => {
-      const field =
-        Array.isArray(err.loc)
-          ? err.loc[err.loc.length - 1]
-          : null;
 
-      const input = field
-        ? document.getElementById(field)
-        : null;
+function buildPayload() {
+    return {
+        age: Number(getValue("age")),
 
-      const target =
-        field === "stress_level"
-          ? stressHiddenInput
-          : input;
+        gender: getValue("gender"),
 
-      if (target) {
-        setFieldError(
-          target,
-          err.msg || "Invalid value."
-        );
+        country: getValue("country"),
 
-        matched = true;
-      }
+        academic_level: getValue("academic-level"),
+
+        most_used_platform: getValue("most-used-platform"),
+
+        purpose_of_use: getValue("purpose-of-use"),
+
+        avg_daily_usage_hours: Number(
+            getValue("avg-daily-usage-hours")
+        ),
+
+        daily_unlocks: Number(
+            getValue("daily-unlocks")
+        ),
+
+        study_hours: Number(
+            getValue("study-hours")
+        ),
+
+        physical_activity_hours: Number(
+            getValue("physical-activity-hours")
+        ),
+
+        sleep_hours_per_night: Number(
+            getValue("sleep-hours-per-night")
+        ),
+
+        stress_level: getValue("stress-level")
+    };
+}
+
+
+function validatePayload(payload) {
+
+    if (
+        !Number.isInteger(payload.age) ||
+        payload.age < 10 ||
+        payload.age > 100
+    ) {
+        return "Please enter a valid age between 10 and 100.";
+    }
+
+    if (!payload.gender) {
+        return "Please select gender.";
+    }
+
+    if (!payload.country) {
+        return "Please select country.";
+    }
+
+    if (!payload.academic_level) {
+        return "Please select academic level.";
+    }
+
+    if (!payload.most_used_platform) {
+        return "Please select most used platform.";
+    }
+
+    if (!payload.purpose_of_use) {
+        return "Please select purpose of use.";
+    }
+
+    if (
+        !Number.isFinite(payload.avg_daily_usage_hours) ||
+        payload.avg_daily_usage_hours < 0 ||
+        payload.avg_daily_usage_hours > 24
+    ) {
+        return "Please enter valid daily usage hours.";
+    }
+
+    if (
+        !Number.isInteger(payload.daily_unlocks) ||
+        payload.daily_unlocks < 0
+    ) {
+        return "Please enter valid daily unlocks.";
+    }
+
+    if (
+        !Number.isFinite(payload.study_hours) ||
+        payload.study_hours < 0 ||
+        payload.study_hours > 24
+    ) {
+        return "Please enter valid study hours.";
+    }
+
+    if (
+        !Number.isFinite(payload.physical_activity_hours) ||
+        payload.physical_activity_hours < 0 ||
+        payload.physical_activity_hours > 24
+    ) {
+        return "Please enter valid physical activity hours.";
+    }
+
+    if (
+        !Number.isFinite(payload.sleep_hours_per_night) ||
+        payload.sleep_hours_per_night < 0 ||
+        payload.sleep_hours_per_night > 24
+    ) {
+        return "Please enter valid sleep hours.";
+    }
+
+    if (!payload.stress_level) {
+        return "Please select stress level.";
+    }
+
+    return null;
+}
+
+
+stressButtons.forEach((button) => {
+
+    button.addEventListener("click", () => {
+
+        const value = button.dataset.stress;
+
+        if (stressInput) {
+            stressInput.value = value;
+        }
+
+        stressButtons.forEach((btn) => {
+            btn.classList.remove("active");
+            btn.setAttribute("aria-pressed", "false");
+        });
+
+        button.classList.add("active");
+        button.setAttribute("aria-pressed", "true");
     });
 
-    return matched;
-  }
+});
 
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
 
-    clearAllErrors();
+async function predict() {
 
-    const payload = collectPayload();
+    const payload = buildPayload();
 
-    const clientErrors = validate(payload);
+    console.log("Sending data:", payload);
 
-    if (clientErrors.length > 0) {
-      clientErrors.forEach(([input, msg]) => {
-        if (input) {
-          setFieldError(input, msg);
-        }
-      });
+    const validationError =
+        validatePayload(payload);
 
-      clientErrors[0][0]?.focus?.();
+    if (validationError) {
 
-      return;
+        showError(
+            "Invalid input",
+            validationError
+        );
+
+        return;
     }
 
-    setSubmitting(true);
     showState("loading");
 
+    if (submitBtn) {
+        submitBtn.disabled = true;
+    }
+
     try {
-      console.log("Sending data:", payload);
 
-      const res = await fetch(`${API_BASE}/predict`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+        const res = await fetch(
+            `${API_BASE}/predict`,
+            {
+                method: "POST",
 
-      console.log("API Status:", res.status);
+                headers: {
+                    "Content-Type": "application/json"
+                },
 
-      if (res.status === 422) {
-        const body =
-          await res.json().catch(() => null);
-
-        const matched =
-          body &&
-          applyServerValidationErrors(body.detail);
-
-        renderError(
-          "Check your inputs",
-          matched
-            ? "The API rejected a few fields — details are marked on the form."
-            : "The API rejected this submission. Please review your inputs and try again."
+                body: JSON.stringify(payload)
+            }
         );
 
-        return;
-      }
+        console.log(
+            "API Status:",
+            res.status
+        );
 
-      if (!res.ok) {
-        let detailMsg =
-          `The API responded with status ${res.status}.`;
+        const data = await res.json();
 
-        const body =
-          await res.json().catch(() => null);
+        console.log(
+            "API RESPONSE:",
+            data
+        );
 
-        if (
-          body &&
-          typeof body.detail === "string"
-        ) {
-          detailMsg = body.detail;
+        if (!res.ok) {
+
+            if (res.status === 422) {
+
+                showError(
+                    "Invalid data",
+                    "The submitted data does not match the required format."
+                );
+
+            } else {
+
+                showError(
+                    "Prediction failed",
+                    "The server could not process your prediction."
+                );
+            }
+
+            return;
         }
 
-        renderError(
-          "Prediction failed",
-          detailMsg
+        const score =
+            Number(
+                data.predicted_mental_health_score
+            );
+
+        console.log(
+            "PREDICTED SCORE:",
+            score
         );
 
-        return;
-      }
+        if (!Number.isFinite(score)) {
 
-      const data = await res.json();
+            showError(
+                "Unexpected response",
+                "The server did not return a valid mental health score."
+            );
 
-      console.log("API RESPONSE:", data);
+            return;
+        }
 
-      const score =
-        Number(data.predicted_mental_health_score);
+        renderResult(score);
 
-      console.log("PREDICTED SCORE:", score);
+    } catch (error) {
 
-      if (!Number.isFinite(score)) {
-        renderError(
-          "Unexpected response",
-          "The API responded, but the score was missing or malformed."
+        console.error(
+            "API ERROR:",
+            error
         );
 
-        return;
-      }
-
-      renderResult(score);
-
-    } catch (err) {
-      console.error("FETCH ERROR:", err);
-
-      renderError(
-        "Can't reach the server",
-        `Couldn't connect to ${API_BASE}.`
-      );
+        showError(
+            "Can't reach the server",
+            "Please check your internet connection and try again."
+        );
 
     } finally {
-      setSubmitting(false);
+
+        if (submitBtn) {
+            submitBtn.disabled = false;
+        }
     }
-  });
+}
 
-  form
-    .querySelectorAll("input, select")
-    .forEach((el) => {
-      el.addEventListener("input", () => {
-        clearFieldError(el);
-      });
 
-      el.addEventListener("change", () => {
-        clearFieldError(el);
-      });
-    });
+if (form) {
 
-  resetBtn.addEventListener("click", () => {
-    showState("idle");
-  });
+    form.addEventListener(
+        "submit",
+        async (event) => {
 
-  errorRetryBtn.addEventListener("click", () => {
-    showState("idle");
-  });
+            event.preventDefault();
 
-})();
+            await predict();
+        }
+    );
+
+}
+
+
+if (resetBtn) {
+
+    resetBtn.addEventListener(
+        "click",
+        () => {
+
+            if (form) {
+                form.reset();
+            }
+
+            if (stressInput) {
+                stressInput.value = "";
+            }
+
+            stressButtons.forEach(
+                (button) => {
+                    button.classList.remove("active");
+                    button.setAttribute(
+                        "aria-pressed",
+                        "false"
+                    );
+                }
+            );
+
+            showState("idle");
+        }
+    );
+
+}
+
+
+if (errorRetryBtn) {
+
+    errorRetryBtn.addEventListener(
+        "click",
+        () => {
+            showState("idle");
+        }
+    );
+
+}
+
+
+document.querySelectorAll(
+    ".gauge-ticks"
+).forEach((g) => {
+
+    g.innerHTML = "";
+
+    const cx = 120;
+    const cy = 140;
+
+    const rOuter = 100;
+    const rInner = 90;
+
+    for (let i = 0; i <= 10; i += 2) {
+
+        const angle =
+            Math.PI -
+            (i / 10) * Math.PI;
+
+        const x1 =
+            cx +
+            rOuter *
+            Math.cos(angle);
+
+        const y1 =
+            cy -
+            rOuter *
+            Math.sin(angle);
+
+        const x2 =
+            cx +
+            rInner *
+            Math.cos(angle);
+
+        const y2 =
+            cy -
+            rInner *
+            Math.sin(angle);
+
+        const line =
+            document.createElementNS(
+                "http://www.w3.org/2000/svg",
+                "line"
+            );
+
+        line.setAttribute(
+            "x1",
+            x1.toFixed(1)
+        );
+
+        line.setAttribute(
+            "y1",
+            y1.toFixed(1)
+        );
+
+        line.setAttribute(
+            "x2",
+            x2.toFixed(1)
+        );
+
+        line.setAttribute(
+            "y2",
+            y2.toFixed(1)
+        );
+
+        g.appendChild(line);
+    }
+
+});
+
+
+showState("idle");
