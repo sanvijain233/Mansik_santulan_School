@@ -1,4 +1,3 @@
-
 (() => {
   "use strict";
 
@@ -23,7 +22,6 @@
 
   const GAUGE_ARC_LENGTH = 314;
 
-  // Draw gauge ticks
   function drawTicks() {
     document.querySelectorAll(".gauge-ticks").forEach((g) => {
       g.innerHTML = "";
@@ -59,7 +57,6 @@
 
   drawTicks();
 
-  // Stress level buttons
   const segGroup = document.getElementById("stress_level_group");
   const stressHiddenInput = document.getElementById("stress_level");
 
@@ -79,12 +76,10 @@
     });
   }
 
-  // Field wrapper
   function fieldWrapper(input) {
     return input.closest(".field");
   }
 
-  // Set field error
   function setFieldError(input, message) {
     const wrap = fieldWrapper(input);
 
@@ -99,7 +94,6 @@
     }
   }
 
-  // Clear field error
   function clearFieldError(input) {
     const wrap = fieldWrapper(input);
 
@@ -114,7 +108,6 @@
     }
   }
 
-  // Clear all errors
   function clearAllErrors() {
     form.querySelectorAll(".field").forEach((f) => {
       f.classList.remove("field-error");
@@ -125,7 +118,6 @@
     });
   }
 
-  // Collect form data
   function collectPayload() {
     const fd = new FormData(form);
 
@@ -178,7 +170,6 @@
     };
   }
 
-  // Validate input
   function validate(payload) {
     const errors = [];
 
@@ -238,7 +229,6 @@
     return errors;
   }
 
-  // Show UI state
   function showState(name) {
     [
       stateIdle,
@@ -263,16 +253,11 @@
     }
   }
 
-  // Submit button
   function setSubmitting(isSubmitting) {
     submitBtn.disabled = isSubmitting;
-    submitBtn.classList.toggle(
-      "loading",
-      isSubmitting
-    );
+    submitBtn.classList.toggle("loading", isSubmitting);
   }
 
-  // Score band
   function bandFor(score) {
     if (score < 4) {
       return {
@@ -297,7 +282,6 @@
     };
   }
 
-  // Display result
   function renderResult(score) {
     const numericScore = Number(score);
 
@@ -308,16 +292,11 @@
 
     const { label, context } = bandFor(clamped);
 
-    // IMPORTANT: Show actual API score
-    scoreNumberEl.textContent =
-      numericScore.toFixed(2);
-
+    scoreNumberEl.textContent = numericScore.toFixed(2);
     scoreBandEl.textContent = label;
-
     scoreContextEl.textContent = context;
 
     gaugeFill.style.transition = "none";
-
     gaugeFill.style.strokeDashoffset =
       String(GAUGE_ARC_LENGTH);
 
@@ -335,7 +314,6 @@
     showState("result");
   }
 
-  // Display error
   function renderError(label, copy) {
     errorLabelEl.textContent = label;
     errorCopyEl.textContent = copy;
@@ -343,7 +321,6 @@
     showState("error");
   }
 
-  // FastAPI validation errors
   function applyServerValidationErrors(detail) {
     if (!Array.isArray(detail)) {
       return false;
@@ -379,7 +356,6 @@
     return matched;
   }
 
-  // Submit form
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
@@ -402,22 +378,18 @@
     }
 
     setSubmitting(true);
-
     showState("loading");
 
     try {
       console.log("Sending data:", payload);
 
-      const res = await fetch(
-        `${API_BASE}/predict`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        }
-      );
+      const res = await fetch(`${API_BASE}/predict`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
 
       console.log("API Status:", res.status);
 
@@ -427,9 +399,7 @@
 
         const matched =
           body &&
-          applyServerValidationErrors(
-            body.detail
-          );
+          applyServerValidationErrors(body.detail);
 
         renderError(
           "Check your inputs",
@@ -467,16 +437,8 @@
 
       console.log("API RESPONSE:", data);
 
-      // IMPORTANT:
-      // FastAPI returns:
-      // {
-      //   "predicted_mental_health_score": 7.85
-      // }
-
       const score =
-        Number(
-          data.predicted_mental_health_score
-        );
+        Number(data.predicted_mental_health_score);
 
       console.log("PREDICTED SCORE:", score);
 
@@ -496,7 +458,7 @@
 
       renderError(
         "Can't reach the server",
-        `Couldn't connect to ${API_BASE}. Make sure the backend is running with "uvicorn main:app --reload".`
+        `Couldn't connect to ${API_BASE}.`
       );
 
     } finally {
@@ -504,7 +466,6 @@
     }
   });
 
-  // Clear errors while editing
   form
     .querySelectorAll("input, select")
     .forEach((el) => {
@@ -517,15 +478,12 @@
       });
     });
 
-  // Reset button
   resetBtn.addEventListener("click", () => {
     showState("idle");
   });
 
-  // Retry button
   errorRetryBtn.addEventListener("click", () => {
     showState("idle");
   });
 
 })();
-
